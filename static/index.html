@@ -1,0 +1,1408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EchoGlow — Neonatal Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Space+Grotesk:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg0:#070C14;--bg1:#0D1520;--bg2:#111D2D;--bg3:#172437;
+  --border:#1E3048;--border2:#253D5B;
+  --teal:#00E5B0;--teal2:#00B88A;
+  --blue:#3DA9F5;--amber:#F5A623;--amber-dim:#3D2800;
+  --red:#FF4757;--red-dim:#3D0A0F;--orange:#FF7A00;
+  --green:#2ECC71;--muted:#4A6480;--purple:#9B6DFF;
+  --text1:#E0EAF6;--text2:#8BA8C4;--text3:#4A6480;
+  --mono:'IBM Plex Mono',monospace;--sans:'Space Grotesk',sans-serif;
+}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg0);color:var(--text1);font-family:var(--sans);font-size:14px;display:flex;flex-direction:column}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.03) 2px,rgba(0,0,0,.03) 4px)}
+
+/* ────────────────── HEADER ────────────────── */
+header{display:flex;align-items:center;gap:8px;padding:7px 14px;
+  border-bottom:1px solid var(--border);background:var(--bg1);flex-shrink:0;flex-wrap:wrap}
+.logo{display:flex;align-items:center;gap:9px}
+.logo-icon{width:30px;height:30px;background:radial-gradient(circle at 40% 40%,var(--teal),var(--teal2));
+  border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;
+  box-shadow:0 0 14px rgba(0,229,176,.35)}
+.logo-text{font-size:15px;font-weight:600;letter-spacing:-.3px}
+.logo-sub{font-size:10px;color:var(--text3);font-family:var(--mono)}
+.hbadges{display:flex;gap:5px}
+.badge{padding:2px 7px;border-radius:5px;font-size:11px;font-family:var(--mono);font-weight:500;
+  letter-spacing:.04em;border:1px solid transparent}
+.ok  {background:rgba(0,229,176,.12);color:var(--teal);border-color:rgba(0,229,176,.25)}
+.warn{background:rgba(245,166,35,.12);color:var(--amber);border-color:rgba(245,166,35,.25)}
+.err {background:rgba(255,71,87,.12);color:var(--red);border-color:rgba(255,71,87,.25)}
+.off {background:rgba(74,100,128,.15);color:var(--muted);border-color:var(--border)}
+.hsp{flex:1}
+.mdllbl{font-family:var(--mono);font-size:10px;color:var(--text3);
+  padding:3px 9px;border:1px solid var(--border);border-radius:5px}
+
+/* ── DEMO / LIVE toggle ── */
+.mode-toggle{display:flex;align-items:center;gap:7px;padding:4px 10px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:8px}
+.mt-lbl{font-family:var(--mono);font-size:11px;color:var(--text3);transition:color .2s}
+.mt-lbl.active{color:var(--text1);font-weight:500}
+.mt-sw{position:relative;width:36px;height:18px;cursor:pointer;flex-shrink:0}
+.mt-sw input{display:none}
+.mt-slider{position:absolute;inset:0;background:var(--amber-dim);border-radius:9px;
+  border:1px solid rgba(245,166,35,.3);transition:all .25s}
+.mt-slider::before{content:'';position:absolute;width:12px;height:12px;
+  left:2px;top:2px;background:var(--amber);border-radius:50%;transition:all .25s}
+.mt-sw input:checked + .mt-slider{background:rgba(0,229,176,.12);border-color:rgba(0,229,176,.3)}
+.mt-sw input:checked + .mt-slider::before{transform:translateX(18px);background:var(--teal)}
+
+/* ── Analysis mode selector ── */
+.amode-sel{display:flex;background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;overflow:hidden}
+.ams{padding:5px 11px;font-size:11px;font-family:var(--sans);cursor:pointer;
+  background:none;border:none;color:var(--text3);transition:all .15s;white-space:nowrap}
+.ams:hover{color:var(--text2);background:var(--bg3)}
+.ams.on{background:var(--bg3);color:var(--text1);font-weight:500}
+.ams+.ams{border-left:1px solid var(--border)}
+
+/* Header buttons */
+.hbtn{padding:5px 12px;border-radius:6px;border:1px solid var(--border);
+  font-family:var(--sans);font-size:12px;font-weight:500;cursor:pointer;
+  background:var(--bg2);color:var(--text2);transition:all .15s;white-space:nowrap}
+.hbtn:hover{border-color:var(--border2);color:var(--text1)}
+.hbtn:disabled{opacity:.35;cursor:not-allowed}
+#btn-go  {background:var(--teal);color:var(--bg0);border-color:var(--teal)}
+#btn-go:hover:not(:disabled){background:#00FFC4;box-shadow:0 0 14px rgba(0,229,176,.4)}
+#btn-stop{background:var(--red-dim);color:var(--red);border-color:var(--red);display:none}
+#btn-stop:hover{background:rgba(255,71,87,.2)}
+#btn-pause{display:none;background:rgba(155,109,255,.1);color:var(--purple);border-color:rgba(155,109,255,.3)}
+#btn-pause.resumed{background:rgba(0,229,176,.08);color:var(--teal);border-color:rgba(0,229,176,.25)}
+#btn-sound{font-size:11px;min-width:106px}
+#btn-sound.muted{opacity:.45}
+.rpt-wrap{position:relative}
+.rpt-menu{position:absolute;top:calc(100%+6px);right:0;background:var(--bg2);
+  border:1px solid var(--border2);border-radius:8px;overflow:hidden;z-index:300;
+  min-width:158px;display:none;box-shadow:0 8px 24px rgba(0,0,0,.45)}
+.rpt-menu.open{display:block}
+.rpt-menu a{display:block;padding:9px 16px;font-size:12px;color:var(--text2);
+  cursor:pointer;transition:background .12s}
+.rpt-menu a:hover{background:var(--bg3);color:var(--text1)}
+
+/* ────────────────── MAIN GRID ────────────────── */
+main{flex:1;overflow:hidden;display:grid;
+  grid-template-rows:118px 1fr;
+  grid-template-columns:248px 1fr 286px;
+  gap:1px;background:var(--border)}
+
+/* Waveform strip */
+.wstrip{grid-column:1/-1;background:var(--bg1);position:relative;overflow:hidden}
+#cv{width:100%;height:100%;display:block}
+.wov{position:absolute;top:7px;left:12px;display:flex;align-items:center;gap:10px}
+.wlbl{font-family:var(--mono);font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em}
+.rdot{width:7px;height:7px;border-radius:50%;background:var(--red);display:none}
+.rdot.on{display:block;animation:pR 1.2s infinite}
+.pdot{width:7px;height:7px;border-radius:50%;background:var(--purple);display:none}
+.pdot.on{display:block;animation:pR 1.5s infinite}
+.amode-badge{position:absolute;top:7px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:10px;padding:2px 10px;border-radius:12px;
+  border:1px solid var(--border2);background:var(--bg2);color:var(--text3)}
+.pitchb{position:absolute;top:7px;right:12px;font-family:var(--mono);font-size:11px;
+  color:var(--teal);background:rgba(0,229,176,.08);border:1px solid rgba(0,229,176,.2);
+  padding:2px 8px;border-radius:5px}
+.wave-paused-ov{position:absolute;inset:0;background:rgba(7,12,20,.55);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center}
+.wave-paused-ov.on{display:flex}
+.wp-lbl{font-family:var(--mono);font-size:13px;color:var(--purple);letter-spacing:.15em;
+  padding:6px 18px;border:1px solid rgba(155,109,255,.4);border-radius:8px;background:rgba(155,109,255,.1)}
+
+@keyframes pR{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(255,71,87,.6)}50%{opacity:.6;box-shadow:0 0 0 5px rgba(255,71,87,0)}}
+@keyframes gR{0%,100%{box-shadow:0 0 10px rgba(255,71,87,.2)}50%{box-shadow:0 0 26px rgba(255,71,87,.55)}}
+@keyframes gO{0%,100%{box-shadow:0 0 8px rgba(255,122,0,.2)}50%{box-shadow:0 0 22px rgba(255,122,0,.45)}}
+@keyframes pV{0%,100%{opacity:1}50%{opacity:.65}}
+@keyframes blink2{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* Left panel */
+.panel{background:var(--bg1);display:flex;flex-direction:column;overflow:hidden}
+.ptitle{padding:9px 12px 7px;font-size:10px;font-weight:600;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text3);border-bottom:1px solid var(--border);flex-shrink:0}
+.volw{padding:11px 12px 0}
+.vollbl{font-family:var(--mono);font-size:10px;color:var(--text3);margin-bottom:4px}
+.volbar{height:7px;background:var(--bg3);border-radius:4px;overflow:hidden}
+.volfill{height:100%;width:0%;border-radius:4px;background:linear-gradient(90deg,var(--teal2),var(--teal));transition:width .1s}
+.volval{font-family:var(--mono);font-size:12px;color:var(--teal);margin-top:3px}
+.sgrid{padding:9px 12px;display:grid;grid-template-columns:1fr 1fr;gap:7px;flex:1;overflow:hidden}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:8px 9px}
+.sn{font-size:10px;color:var(--text3);margin-bottom:2px}
+.sv{font-family:var(--mono);font-size:14px;color:var(--text1)}
+.su{font-size:10px;color:var(--text3)}
+.cryind{margin:0 12px 8px;padding:8px 11px;background:var(--bg2);
+  border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;gap:8px}
+.crydot{width:9px;height:9px;border-radius:50%;background:var(--muted);transition:background .3s}
+.crydot.on{background:var(--red);animation:blink2 1s infinite}
+.crytxt{font-size:12px;color:var(--text2)}
+.crydur{font-family:var(--mono);font-size:11px;color:var(--text3);margin-left:auto}
+.patpill{display:inline-block;padding:3px 9px;border-radius:12px;font-size:11px;
+  background:var(--bg3);color:var(--text2);border:1px solid var(--border);margin:0 12px 8px;font-family:var(--mono)}
+
+/* ── Centre panel ── */
+.ap{background:var(--bg1);display:flex;flex-direction:column;
+  align-items:center;padding:14px 16px;gap:10px;overflow-y:auto;position:relative}
+.ap::-webkit-scrollbar{width:4px}
+.ap::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+/* Paused overlay */
+.ap-paused{position:absolute;inset:0;background:rgba(7,12,20,.65);backdrop-filter:blur(3px);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;z-index:10}
+.ap-paused.on{display:flex}
+.ap-paused-ico{font-size:30px;opacity:.7}
+.ap-paused-txt{font-family:var(--mono);font-size:13px;color:var(--purple);letter-spacing:.1em}
+.ap-paused-sub{font-size:12px;color:var(--text3);text-align:center;line-height:1.6}
+.ap-paused-upbtn{padding:9px 20px;border-radius:8px;border:1px solid rgba(155,109,255,.4);
+  background:rgba(155,109,255,.1);color:var(--purple);font-size:13px;cursor:pointer;transition:all .15s}
+.ap-paused-upbtn:hover{background:rgba(155,109,255,.2)}
+
+.idle-msg{text-align:center;color:var(--text3);padding-top:16px;width:100%}
+.idle-msg p{font-size:13px;margin-top:10px}
+
+/* Classification badge */
+.cbadge{padding:11px 20px;border-radius:12px;font-size:18px;font-weight:600;
+  letter-spacing:.05em;text-align:center;width:100%;transition:all .4s}
+.cb-calm{background:rgba(0,229,176,.12);color:var(--teal);border:1px solid rgba(0,229,176,.3)}
+.cb-hunger{background:rgba(245,166,35,.12);color:var(--amber);border:1px solid rgba(245,166,35,.3)}
+.cb-discomfort{background:rgba(245,166,35,.10);color:var(--amber);border:1px solid rgba(245,166,35,.2)}
+.cb-pain{background:rgba(255,71,87,.15);color:var(--red);border:1px solid rgba(255,71,87,.4);animation:gR 2s infinite}
+.cb-stridor{background:rgba(255,71,87,.2);color:#FF8F9A;border:1px solid var(--red);animation:gR .8s infinite;box-shadow:0 0 20px rgba(255,71,87,.3)}
+.cb-wheezing{background:rgba(255,122,0,.15);color:var(--orange);border:1px solid rgba(255,122,0,.4);animation:gO 1.5s infinite}
+.cb-respiratory_distress{background:rgba(255,71,87,.25);color:#FF3347;border:2px solid var(--red);animation:gR .6s infinite;box-shadow:0 0 28px rgba(255,71,87,.4)}
+.cb-unknown{background:var(--bg3);color:var(--text3);border:1px solid var(--border)}
+
+.sevrow{display:flex;align-items:center;gap:8px;width:100%}
+.sevlbl{font-size:11px;color:var(--text3);font-family:var(--mono)}
+.sevbadge{padding:3px 10px;border-radius:6px;font-size:12px;font-weight:600;font-family:var(--mono)}
+.sv-normal{background:rgba(46,204,113,.12);color:var(--green)}
+.sv-monitor{background:rgba(245,166,35,.15);color:var(--amber)}
+.sv-urgent{background:rgba(255,71,87,.2);color:var(--red)}
+.sv-critical{background:var(--red);color:white;animation:pV .8s infinite}
+.srctag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:4px;
+  background:rgba(61,169,245,.1);color:var(--blue);border:1px solid rgba(61,169,245,.2);margin-left:auto}
+
+.confw{width:100%}
+.conftop{display:flex;justify-content:space-between;margin-bottom:4px}
+.conflbl,.confval{font-size:10px;font-family:var(--mono)}
+.conflbl{color:var(--text3)}.confval{color:var(--teal)}
+.conftrack{height:5px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.conffill{height:100%;background:var(--teal);border-radius:3px;transition:width .5s}
+
+.rbox{width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:8px;padding:10px 13px}
+.abox{width:100%;border-radius:8px;padding:9px 13px}
+.rtitle,.atitle{font-size:10px;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
+.rtitle{color:var(--text3)}.rtxt{font-size:12px;color:var(--text2);line-height:1.6}
+.ab-normal{background:rgba(46,204,113,.06);border:1px solid rgba(46,204,113,.2)}
+.ab-monitor{background:rgba(245,166,35,.06);border:1px solid rgba(245,166,35,.25)}
+.ab-urgent{background:rgba(255,71,87,.08);border:1px solid rgba(255,71,87,.3)}
+.ab-critical{background:rgba(255,71,87,.15);border:1px solid var(--red)}
+.at-normal{color:var(--green)}.at-monitor{color:var(--amber)}.at-urgent,.at-critical{color:var(--red)}
+.abt-normal{color:#6ee09a}.abt-monitor{color:#f5c46a}
+.abt-urgent,.abt-critical{color:#ff8f9a}.abt-critical{color:#ff3347;font-weight:600}
+
+.actrow{display:flex;gap:7px;width:100%;flex-wrap:wrap}
+.actbtn{padding:5px 11px;border-radius:7px;font-size:11px;font-family:var(--sans);
+  cursor:pointer;border:1px solid var(--border2);background:var(--bg2);color:var(--text2);transition:all .15s}
+.actbtn:hover{background:var(--bg3);color:var(--text1)}
+.actbtn.tl{border-color:rgba(0,229,176,.4);color:var(--teal);background:rgba(0,229,176,.08)}
+.actbtn.tl:hover{background:rgba(0,229,176,.15)}
+
+/* Camera frame preview inside analysis panel */
+.cam-preview{width:100%;border-radius:8px;overflow:hidden;border:1px solid var(--border);
+  position:relative;background:var(--bg2)}
+.cam-preview img{width:100%;max-height:140px;object-fit:cover;display:block}
+.cam-preview .cam-lbl{position:absolute;bottom:0;left:0;right:0;padding:4px 8px;
+  font-family:var(--mono);font-size:10px;color:var(--text2);
+  background:rgba(7,12,20,.7)}
+.cam-preview .cam-lbl.live{color:var(--teal)}
+.cam-empty{width:100%;border:1.5px dashed var(--border2);border-radius:8px;
+  padding:14px;text-align:center;background:var(--bg2)}
+.cam-empty .ce-icon{font-size:22px;margin-bottom:6px}
+.cam-empty p{font-size:11px;color:var(--text3)}
+
+/* Upload trigger */
+.upload-sec{width:100%}
+.upload-lbl{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px}
+.uarea{border:1.5px dashed var(--border2);border-radius:10px;padding:12px;
+  text-align:center;background:var(--bg2);cursor:pointer;transition:all .2s}
+.uarea:hover,.uarea.hl{border-color:var(--teal);background:rgba(0,229,176,.04)}
+.uarea .uico{font-size:20px}.uarea p{font-size:11px;color:var(--text3);margin-top:4px}
+.uprev{width:100%;border-radius:8px;overflow:hidden;border:1px solid var(--border);
+  position:relative;display:none}
+.uprev img{width:100%;max-height:120px;object-fit:cover;display:block}
+.uprev .uclear{position:absolute;top:5px;right:5px;background:rgba(0,0,0,.75);
+  color:white;border:none;border-radius:4px;font-size:11px;padding:2px 7px;cursor:pointer}
+.upov{position:absolute;inset:0;background:rgba(7,12,20,.82);
+  display:none;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  font-size:12px;color:var(--teal)}
+
+/* Right panel */
+.alp{background:var(--bg1);display:flex;flex-direction:column;overflow:hidden}
+.alist{flex:1;overflow-y:auto;padding:4px 0}
+.alist::-webkit-scrollbar{width:4px}
+.alist::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+.aitem{padding:9px 12px;border-bottom:1px solid var(--border);transition:background .15s}
+.aitem:hover{background:var(--bg2)}
+.aitop{display:flex;align-items:center;gap:6px;margin-bottom:3px}
+.adot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.ad-monitor{background:var(--amber)}
+.ad-urgent{background:var(--red);animation:pR 1.5s infinite}
+.ad-critical{background:var(--red);animation:pR .8s infinite;box-shadow:0 0 6px var(--red)}
+.acls{font-size:12px;font-weight:600;flex:1}
+.asnd{background:none;border:none;color:var(--text3);cursor:pointer;font-size:12px;
+  padding:0 3px;border-radius:3px;transition:color .15s}
+.asnd:hover{color:var(--teal)}
+.atime{font-family:var(--mono);font-size:10px;color:var(--text3)}
+.anote{font-size:11px;color:var(--text2);line-height:1.4;overflow:hidden;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.asev{font-family:var(--mono);font-size:10px;margin-top:3px}
+.empty-feed{padding:26px 12px;text-align:center;font-size:12px;color:var(--text3);line-height:1.7}
+.empty-feed span{display:block;font-size:22px;margin-bottom:8px;opacity:.4}
+
+/* Footer */
+footer{display:flex;align-items:center;gap:14px;padding:6px 16px;
+  background:var(--bg1);border-top:1px solid var(--border);flex-shrink:0}
+.fstat{font-family:var(--mono);font-size:11px;color:var(--text3)}
+.fstat span{color:var(--text2)}.fsp{flex:1}
+.fmode{font-family:var(--mono);font-size:11px;padding:2px 9px;border-radius:4px;
+  background:rgba(61,169,245,.08);color:var(--blue);border:1px solid rgba(61,169,245,.2)}
+.fmode.paused{background:rgba(155,109,255,.1);color:var(--purple);border-color:rgba(155,109,255,.3)}
+
+/* Flash */
+.flash{position:fixed;inset:0;pointer-events:none;z-index:9998;background:transparent;transition:background .1s}
+.flash.critical{background:rgba(255,71,87,.1)}.flash.urgent{background:rgba(255,122,0,.07)}
+
+/* ── DEMO NARRATION OVERLAY ── */
+#narrator{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(8px);
+  z-index:6000;background:rgba(7,12,20,.95);border:1px solid rgba(0,229,176,.4);
+  border-radius:28px;padding:10px 24px;font-size:13px;color:var(--text1);
+  opacity:0;transition:opacity .4s,transform .4s;backdrop-filter:blur(12px);
+  max-width:680px;text-align:center;pointer-events:none;white-space:nowrap;
+  box-shadow:0 4px 24px rgba(0,0,0,.5)}
+#narrator.on{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* ── DEMO PROGRESS BAR ── */
+#demo-bar{position:absolute;bottom:0;left:0;height:2px;width:0%;
+  background:linear-gradient(90deg,var(--teal),var(--blue));
+  transition:width .5s linear;display:none;z-index:10}
+#demo-bar.on{display:block}
+#demo-step-lbl{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);
+  font-family:var(--mono);font-size:9px;color:rgba(0,229,176,.6);
+  letter-spacing:.08em;pointer-events:none;display:none}
+#demo-step-lbl.on{display:block}
+
+/* ── FULL DEMO button ── */
+#btn-fulldemo{background:linear-gradient(135deg,rgba(0,229,176,.15),rgba(61,169,245,.15));
+  color:var(--teal);border-color:rgba(0,229,176,.4);font-size:11px;position:relative}
+#btn-fulldemo:hover{background:linear-gradient(135deg,rgba(0,229,176,.25),rgba(61,169,245,.25));
+  box-shadow:0 0 12px rgba(0,229,176,.25)}
+#btn-fulldemo.running{color:var(--red);border-color:rgba(255,71,87,.5);
+  background:rgba(255,71,87,.1);animation:pV .8s infinite}
+</style>
+</head>
+<body>
+<div class="flash" id="flash"></div>
+
+<!-- ────────────────── HEADER ────────────────── -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🫁</div>
+    <div><div class="logo-text">EchoGlow</div><div class="logo-sub">Neonatal Distress Monitor</div></div>
+  </div>
+
+  <div class="hbadges">
+    <div class="badge off" id="b-ws">WS</div>
+    <div class="badge off" id="b-gem">Gemma</div>
+    <div class="badge off" id="b-mic">MIC</div>
+    <div class="badge off" id="b-cam">CAM</div>
+  </div>
+
+  <div class="hsp"></div>
+  <div class="mdllbl" id="mdl">—</div>
+
+  <!-- DEMO / LIVE toggle -->
+  <div class="mode-toggle" title="Toggle between Demo simulation and Live microphone">
+    <span class="mt-lbl active" id="lbl-demo">DEMO</span>
+    <label class="mt-sw">
+      <input type="checkbox" id="live-chk" onchange="onModeToggle()">
+      <span class="mt-slider"></span>
+    </label>
+    <span class="mt-lbl" id="lbl-live">LIVE</span>
+  </div>
+
+  <!-- Analysis mode: Audio / Video / Both -->
+  <div class="amode-sel" id="amode-sel">
+    <button class="ams on" data-m="audio"  onclick="setAMode('audio')">🎤 Audio</button>
+    <button class="ams"    data-m="video"  onclick="setAMode('video')">📷 Video</button>
+    <button class="ams"    data-m="both"   onclick="setAMode('both')">🎤+📷 Both</button>
+  </div>
+
+  <!-- Utility buttons -->
+  <button class="hbtn" id="btn-sound" onclick="Sound.toggle()">🔔 Alerts: ON</button>
+
+  <div class="rpt-wrap">
+    <button class="hbtn" onclick="toggleRpt()">📥 Report ▾</button>
+    <div class="rpt-menu" id="rpt-menu">
+      <a onclick="dlReport(1)">⬇ Last 1 Hour</a>
+      <a onclick="dlReport(7)">⬇ Last 7 Hours</a>
+      <a onclick="dlReport(12)">⬇ Last 12 Hours</a>
+      <a onclick="dlReport(24)">⬇ Last 24 Hours</a>
+    </div>
+  </div>
+
+  <!-- Session controls -->
+  <button class="hbtn" id="btn-fulldemo" onclick="Demo.toggle()" title="Run full scripted demo for submission video">🎬 Full Demo</button>
+  <button class="hbtn" id="btn-go"    onclick="startSess()">▶ Start</button>
+  <button class="hbtn" id="btn-pause" onclick="togglePause()">⏸ Pause</button>
+  <button class="hbtn" id="btn-stop"  onclick="stopSess()">■ Stop</button>
+</header>
+
+<!-- ────────────────── MAIN GRID ────────────────── -->
+<main>
+  <!-- Waveform strip -->
+  <div class="wstrip">
+    <canvas id="cv"></canvas>
+    <div class="wov">
+      <div class="wlbl">Audio Waveform</div>
+      <div class="rdot" id="rdot"></div>
+      <div class="pdot" id="pdot"></div>
+    </div>
+    <div class="amode-badge" id="amode-badge">—</div>
+    <div class="pitchb" id="pitchb">— Hz</div>
+    <div class="wave-paused-ov" id="wave-pov">
+      <div class="wp-lbl">⏸ ANALYSIS PAUSED</div>
+    </div>
+    <div id="demo-bar"></div>
+    <div id="demo-step-lbl"></div>
+  </div>
+
+  <!-- Left: audio stats -->
+  <div class="panel">
+    <div class="ptitle">Audio Metrics</div>
+    <div class="volw">
+      <div class="vollbl">SIGNAL ENERGY</div>
+      <div class="volbar"><div class="volfill" id="volfill"></div></div>
+      <div class="volval" id="volval">0.0000</div>
+    </div>
+    <div class="sgrid">
+      <div class="sc"><div class="sn">Pitch</div>
+        <div class="sv" id="sp">—<span class="su"> Hz</span></div></div>
+      <div class="sc"><div class="sn">Centroid</div>
+        <div class="sv" id="sc2">—<span class="su"> Hz</span></div></div>
+      <div class="sc"><div class="sn">ZCR</div>
+        <div class="sv" id="sz">—</div></div>
+      <div class="sc"><div class="sn">Analyses</div>
+        <div class="sv" id="sa">0</div></div>
+    </div>
+    <div class="cryind">
+      <div class="crydot" id="crydot"></div>
+      <div class="crytxt" id="crytxt">No Cry Detected</div>
+      <div class="crydur" id="crydur"></div>
+    </div>
+    <div class="patpill" id="patpill">PATTERN: —</div>
+  </div>
+
+  <!-- Centre: analysis -->
+  <div class="ap" id="ap">
+    <div class="idle-msg" id="idlemsg">
+      <svg width="48" height="48" fill="none" viewBox="0 0 56 56" style="opacity:.2">
+        <circle cx="28" cy="28" r="26" stroke="#4A6480" stroke-width="1.5"/>
+        <path d="M20 28 q4-10 8 0 q4 10 8 0" stroke="#4A6480" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+      </svg>
+      <p>Configure mode above, then press <strong>▶ Start</strong>.</p>
+    </div>
+
+    <!-- Paused overlay -->
+    <div class="ap-paused" id="ap-paused">
+      <div class="ap-paused-ico">⏸</div>
+      <div class="ap-paused-txt">ANALYSIS PAUSED</div>
+      <div class="ap-paused-sub">Audio waveform continues in background.<br>
+        Upload a photo for visual analysis, or Resume.</div>
+      <button class="ap-paused-upbtn" onclick="triggerUpload()">📷 Upload Photo for Analysis</button>
+    </div>
+  </div>
+
+  <!-- Right: alerts -->
+  <div class="alp">
+    <div class="ptitle">Alert Feed</div>
+    <div class="alist" id="alist">
+      <div class="empty-feed"><span>🔕</span>No alerts yet.<br>Events appear here.</div>
+    </div>
+  </div>
+</main>
+
+<!-- ────────────────── FOOTER ────────────────── -->
+<footer>
+  <div class="fstat">SESSION <span id="fdur">—</span></div>
+  <div class="fstat">ALERTS <span id="falerts">0</span></div>
+  <div class="fstat">MODE <span id="fam">—</span></div>
+  <div class="fstat">LAST <span id="flast">—</span></div>
+  <div class="fsp"></div>
+  <div class="fmode" id="fmode">IDLE</div>
+</footer>
+
+<!-- Hidden file input -->
+<input type="file" id="finp" accept="image/*" style="display:none">
+
+<!-- Narrator overlay -->
+<div id="narrator"></div>
+
+<!-- Off-screen canvas for generating demo images -->
+<canvas id="demo-canvas" width="320" height="240" style="display:none"></canvas>
+
+<script>
+/* ════════════════════════════════════════════
+   SOUND SYSTEM
+   ════════════════════════════════════════════ */
+const Sound = (() => {
+  let _ctx=null, enabled=true, lastAlert=0;
+  const ctx=()=>{if(!_ctx)_ctx=new(window.AudioContext||window.webkitAudioContext)();return _ctx};
+
+  function beep(freq,dur,delay=0,type='sine',vol=0.22){
+    const c=ctx(),o=c.createOscillator(),g=c.createGain();
+    o.connect(g);g.connect(c.destination);o.type=type;o.frequency.value=freq;
+    const t=c.currentTime+delay;
+    g.gain.setValueAtTime(vol,t);g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+    o.start(t);o.stop(t+dur+0.02);
+  }
+
+  function alert(sev){
+    if(!enabled)return;
+    const now=Date.now();if(now-lastAlert<4000)return;lastAlert=now;
+    if(sev==='critical'){
+      for(let i=0;i<3;i++)beep(920,.13,i*.21,'square',.28);
+      setTimeout(()=>{for(let i=0;i<3;i++)beep(920,.13,i*.21,'square',.28)},720);
+    }else if(sev==='urgent'){beep(700,.25,0,'sine');beep(700,.25,.38,'sine');}
+    else beep(480,.45,0,'sine',.15);
+    const f=document.getElementById('flash');
+    f.className='flash '+sev;setTimeout(()=>f.className='flash',320);
+  }
+
+  const synths={
+    hunger(c,d){const o=c.createOscillator(),lfo=c.createOscillator(),lg=c.createGain(),g=c.createGain();
+      o.type='sine';o.frequency.value=380;lfo.type='sine';lfo.frequency.value=2.1;lg.gain.value=.32;
+      g.gain.setValueAtTime(.28,c.currentTime);g.gain.linearRampToValueAtTime(0,c.currentTime+d);
+      lfo.connect(lg);lg.connect(g.gain);o.connect(g);g.connect(c.destination);
+      o.start();lfo.start();o.stop(c.currentTime+d);lfo.stop(c.currentTime+d);},
+    pain(c,d){const o=c.createOscillator(),o2=c.createOscillator(),g=c.createGain(),g2=c.createGain();
+      o.type='sawtooth';o.frequency.setValueAtTime(480,c.currentTime);
+      o.frequency.exponentialRampToValueAtTime(590,c.currentTime+d);
+      o2.type='sine';o2.frequency.value=960;g2.gain.value=.07;
+      g.gain.setValueAtTime(.05,c.currentTime);g.gain.exponentialRampToValueAtTime(.38,c.currentTime+d*.55);
+      g.gain.linearRampToValueAtTime(0,c.currentTime+d);
+      o.connect(g);o2.connect(g2);g2.connect(g);g.connect(c.destination);
+      o.start();o2.start();o.stop(c.currentTime+d);o2.stop(c.currentTime+d);},
+    stridor(c,d){const bs=Math.ceil(c.sampleRate*d),buf=c.createBuffer(1,bs,c.sampleRate);
+      const da=buf.getChannelData(0);for(let i=0;i<bs;i++)da[i]=(Math.random()*2-1);
+      const src=c.createBufferSource();src.buffer=buf;
+      const bp=c.createBiquadFilter();bp.type='bandpass';bp.frequency.value=285;bp.Q.value=1.8;
+      const g=c.createGain(),lfo=c.createOscillator(),lg=c.createGain();
+      g.gain.value=.52;lfo.frequency.value=.8;lg.gain.value=.28;
+      lfo.connect(lg);lg.connect(g.gain);src.connect(bp);bp.connect(g);g.connect(c.destination);
+      src.start();lfo.start();lfo.stop(c.currentTime+d);},
+    wheezing(c,d){const o=c.createOscillator(),vib=c.createOscillator(),vg=c.createGain(),g=c.createGain();
+      o.type='triangle';o.frequency.value=240;vib.frequency.value=4.2;vg.gain.value=14;
+      g.gain.setValueAtTime(.28,c.currentTime);g.gain.linearRampToValueAtTime(0,c.currentTime+d);
+      vib.connect(vg);vg.connect(o.frequency);o.connect(g);g.connect(c.destination);
+      o.start();vib.start();o.stop(c.currentTime+d);vib.stop(c.currentTime+d);},
+    discomfort(c,d){const o=c.createOscillator(),g=c.createGain();
+      o.type='sine';o.frequency.value=310;g.gain.value=0;
+      for(let i=0;i<Math.floor(d/.6);i++){const t=c.currentTime+i*.6;
+        g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.18,t+.1);g.gain.linearRampToValueAtTime(0,t+.4);}
+      o.connect(g);g.connect(c.destination);o.start();o.stop(c.currentTime+d);},
+    calm(c,d){const bs=Math.ceil(c.sampleRate*d),buf=c.createBuffer(1,bs,c.sampleRate);
+      const da=buf.getChannelData(0);for(let i=0;i<bs;i++)da[i]=(Math.random()*2-1)*.012;
+      const src=c.createBufferSource();src.buffer=buf;src.connect(c.destination);src.start();}
+  };
+
+  function playCry(type){
+    const c=ctx(),d=3.5;
+    (synths[type]||synths.discomfort)(c,d);
+  }
+
+  function toggle(){
+    enabled=!enabled;
+    const b=document.getElementById('btn-sound');
+    b.textContent=enabled?'🔔 Alerts: ON':'🔕 Alerts: OFF';
+    b.classList.toggle('muted',!enabled);
+  }
+
+  return{alert,playCry,toggle,warm:ctx};
+})();
+
+/* ════════════════════════════════════════════
+   STATE
+   ════════════════════════════════════════════ */
+let ws, sessActive=false, sessPaused=false, camOK=false;
+let analysisMode='audio';  // audio | video | both
+let liveMode=false;        // false=demo, true=live
+let autoPaused=false;
+let snapInterval=null;
+const waveData=new Array(300).fill(0);
+
+const CLS={calm:'CALM',hunger:'HUNGER CRY',discomfort:'DISCOMFORT',pain:'PAIN CRY',
+  stridor:'STRIDOR',wheezing:'WHEEZE',respiratory_distress:'RESP. DISTRESS',unknown:'UNKNOWN'};
+
+/* ════════════════════════════════════════════
+   WEBSOCKET
+   ════════════════════════════════════════════ */
+function connectWS(){
+  const proto=location.protocol==='https:'?'wss':'ws';
+  ws=new WebSocket(`${proto}://${location.host}/ws`);
+  ws.onopen=()=>badge('b-ws','WS','ok');
+  ws.onclose=()=>{badge('b-ws','WS','err');setTimeout(connectWS,2000)};
+  ws.onerror=()=>badge('b-ws','WS','err');
+  ws.onmessage=e=>handle(JSON.parse(e.data));
+}
+
+function handle(d){
+  const t=d.type;
+  if(t==='state')           hdState(d);
+  else if(t==='heartbeat')       hdHB(d);
+  else if(t==='analysis')        hdAn(d);
+  else if(t==='image_analysis')  hdImgAn(d);
+  else if(t==='paused')          hdPaused();
+  else if(t==='resumed')         hdResumed();
+  else if(t==='stopped')         hdStop();
+  else if(t==='mode_changed')    hdModeChange(d);
+}
+
+function hdState(d){
+  badge('b-gem','Gemma',d.ollama_ok?'ok':'err');
+  badge('b-mic','MIC',d.mic_ok?'ok':'warn');
+  badge('b-cam','CAM',d.camera_ok?'ok':'off');
+  document.getElementById('mdl').textContent=d.model||'—';
+  camOK=!!d.camera_ok;
+  if(d.session?.is_active){
+    sessActive=true;
+    analysisMode=d.session.analysis_mode||'audio';
+    showBtns(true);
+    document.getElementById('rdot').classList.add('on');
+    setFMode(d.session.mode||'live');
+    syncAmodeUI(analysisMode);
+    if(d.paused) hdPaused();
+  }
+  if(d.waveform?.length) waveData.splice(0,waveData.length,...d.waveform);
+  renderCentre(null);
+}
+
+function hdHB(d){
+  pushWave(d.rms||0);updVol(d.rms||0);
+  if(d.pitch!==undefined){
+    document.getElementById('pitchb').textContent=d.pitch>0?`${d.pitch.toFixed(0)} Hz`:'— Hz';
+    document.getElementById('sp').innerHTML=d.pitch>0?`${d.pitch.toFixed(0)}<span class="su"> Hz</span>`:'—';
+  }
+  updCry(d.cry_detected,0);updDur(d.session_duration||0);
+  if(d.analysis_mode) analysisMode=d.analysis_mode;
+}
+
+function hdAn(d){
+  const f=d.features||{},a=d.analysis||{};
+  if(d.waveform?.length) waveData.splice(0,waveData.length,...d.waveform);
+  updVol(f.rms||0);
+  document.getElementById('sp').innerHTML=f.pitch>0?`${f.pitch.toFixed(0)}<span class="su"> Hz</span>`:'—';
+  document.getElementById('sc2').innerHTML=f.centroid>0?`${f.centroid.toFixed(0)}<span class="su"> Hz</span>`:'—';
+  document.getElementById('sz').textContent=f.zcr!==undefined?f.zcr.toFixed(3):'—';
+  document.getElementById('sa').textContent=d.analysis_count??'—';
+  document.getElementById('pitchb').textContent=f.pitch>0?`${f.pitch.toFixed(0)} Hz`:'— Hz';
+  updCry(f.cry_detected,f.cry_duration||0);
+  document.getElementById('patpill').textContent=`PATTERN: ${(f.pattern||'—').toUpperCase()}`;
+  if(d.analysis_mode){analysisMode=d.analysis_mode;syncAmodeUI(analysisMode);}
+  // Don't overwrite panel while an image result is pinned
+  if(!imgResultPinned) renderCentre(a, d.frame||null);
+  updDur(d.session_duration||0);
+  document.getElementById('falerts').textContent=d.alert_count??0;
+  document.getElementById('flast').textContent=new Date().toLocaleTimeString();
+  if(a.severity&&a.severity!=='normal'){addAlert(a);Sound.alert(a.severity);}
+}
+
+function hdModeChange(d){
+  analysisMode=d.analysis_mode;
+  syncAmodeUI(analysisMode);
+  document.getElementById('fam').textContent=analysisMode.toUpperCase();
+  document.getElementById('amode-badge').textContent=amodeLabel(analysisMode);
+  renderCentre(null);
+}
+
+// ── Image analysis result from WS broadcast ──────────────────────────────────
+let imgResultPinned=false;  // prevents audio analysis from overwriting image result
+
+function hdImgAn(d){
+  const a=d.analysis||{};
+  imgResultPinned=true;
+
+  // Update alert counter
+  document.getElementById('falerts').textContent=d.alert_count??0;
+  document.getElementById('flast').textContent=new Date().toLocaleTimeString();
+
+  // Always add to alert feed with 📷 marker
+  addAlert(a, true);
+  if(a.severity&&a.severity!=='normal') Sound.alert(a.severity);
+
+  // Show result prominently in the main analysis panel
+  showImageResult(a);
+
+  // Unpin after 30 s so audio analysis can resume updating
+  clearTimeout(window._imgPinTimer);
+  window._imgPinTimer=setTimeout(()=>{ imgResultPinned=false; },30000);
+}
+
+function hdPaused(){
+  sessPaused=true;
+  document.getElementById('btn-pause').textContent='▶ Resume';
+  document.getElementById('btn-pause').classList.add('resumed');
+  document.getElementById('rdot').classList.remove('on');
+  document.getElementById('pdot').classList.add('on');
+  document.getElementById('wave-pov').classList.add('on');
+  document.getElementById('ap-paused').classList.add('on');
+  document.getElementById('fmode').classList.add('paused');
+  document.getElementById('fmode').textContent='PAUSED';
+  stopSnapPoll();
+}
+
+function hdResumed(){
+  sessPaused=false;
+  document.getElementById('btn-pause').textContent='⏸ Pause';
+  document.getElementById('btn-pause').classList.remove('resumed');
+  document.getElementById('rdot').classList.add('on');
+  document.getElementById('pdot').classList.remove('on');
+  document.getElementById('wave-pov').classList.remove('on');
+  document.getElementById('ap-paused').classList.remove('on');
+  document.getElementById('fmode').classList.remove('paused');
+  setFMode(liveMode?'live':'simulation');
+  if(analysisMode!=='audio' && camOK) startSnapPoll();
+}
+
+function hdStop(){
+  sessActive=false;sessPaused=false;
+  showBtns(false);stopSnapPoll();
+  document.getElementById('rdot').classList.remove('on');
+  document.getElementById('pdot').classList.remove('on');
+  document.getElementById('wave-pov').classList.remove('on');
+  document.getElementById('ap-paused').classList.remove('on');
+  document.getElementById('fmode').classList.remove('paused');
+  document.getElementById('fmode').textContent='IDLE';
+}
+
+/* ════════════════════════════════════════════
+   RENDER ANALYSIS PANEL
+   ════════════════════════════════════════════ */
+function renderCentre(a, frameB64=null){
+  document.getElementById('idlemsg')?.remove();
+  const ap=document.getElementById('ap');
+
+  // Build camera/video section HTML
+  let camHTML='';
+  if(analysisMode==='video'||analysisMode==='both'){
+    if(frameB64){
+      camHTML=`<div class="cam-preview">
+        <img src="data:image/jpeg;base64,${frameB64}" alt="Camera frame">
+        <div class="cam-lbl live">📷 Camera Frame — ${new Date().toLocaleTimeString()}</div>
+      </div>`;
+    } else if(camOK){
+      camHTML=`<div class="cam-preview">
+        <img id="snap-img" src="" alt="" style="display:none">
+        <div style="height:80px;display:flex;align-items:center;justify-content:center">
+          <div style="font-size:11px;color:var(--text3)">Waiting for camera frame…</div>
+        </div>
+        <div class="cam-lbl">📷 Live Camera</div>
+      </div>`;
+    } else {
+      camHTML=`<div class="upload-sec" id="upsec">
+        <div class="upload-lbl">📷 Visual Input — Upload Photo</div>
+        <div class="uarea" id="uarea">
+          <div class="uico">📸</div>
+          <p>Click or drag to upload an infant photo<br>for Gemma 4 visual analysis</p>
+        </div>
+        <div class="uprev" id="uprev">
+          <img id="previmg" src="" alt="">
+          <button class="uclear" id="uclear">✕</button>
+          <div class="upov" id="upov"><div>🔍</div><div>Analyzing…</div></div>
+        </div>
+      </div>`;
+    }
+  }
+
+  if(!a||!a.cry_classification){
+    ap.innerHTML = `
+      ${sessActive?'':'<div class="idle-msg" id="idlemsg"><svg width="48" height="48" fill="none" viewBox="0 0 56 56" style="opacity:.2"><circle cx="28" cy="28" r="26" stroke="#4A6480" stroke-width="1.5"/><path d="M20 28 q4-10 8 0 q4 10 8 0" stroke="#4A6480" stroke-width="1.5" fill="none" stroke-linecap="round"/></svg><p>Configure mode above, then press <strong>▶ Start</strong>.</p></div>'}
+      ${camHTML}
+      <div class="ap-paused" id="ap-paused"${sessPaused?' class="ap-paused on"':''}>
+        <div class="ap-paused-ico">⏸</div>
+        <div class="ap-paused-txt">ANALYSIS PAUSED</div>
+        <div class="ap-paused-sub">Upload a photo for visual analysis, or Resume.</div>
+        <button class="ap-paused-upbtn" onclick="triggerUpload()">📷 Upload Photo</button>
+      </div>`;
+    bindUpload();return;
+  }
+
+  const cls=a.cry_classification,sev=a.severity||'normal',conf=Math.round((a.confidence||0)*100);
+  const prevPaused=document.getElementById('ap-paused');
+  const prevPausedHTML=prevPaused?prevPaused.outerHTML
+    :`<div class="ap-paused" id="ap-paused"><div class="ap-paused-ico">⏸</div>
+      <div class="ap-paused-txt">ANALYSIS PAUSED</div>
+      <div class="ap-paused-sub">Upload a photo for visual analysis, or Resume.</div>
+      <button class="ap-paused-upbtn" onclick="triggerUpload()">📷 Upload Photo</button></div>`;
+
+  ap.innerHTML=`
+    <div class="cbadge cb-${cls}">${CLS[cls]||cls.toUpperCase()}</div>
+    <div class="sevrow">
+      <div class="sevlbl">SEVERITY</div>
+      <div class="sevbadge sv-${sev}">${sev.toUpperCase()}</div>
+      <div class="srctag">${a.source==='gemma'?'✦ Gemma 4':'◆ Fallback'}</div>
+    </div>
+    <div class="confw">
+      <div class="conftop"><div class="conflbl">CONFIDENCE</div><div class="confval">${conf}%</div></div>
+      <div class="conftrack"><div class="conffill" style="width:${conf}%"></div></div>
+    </div>
+    <div class="rbox">
+      <div class="rtitle">Clinical Reasoning</div>
+      <div class="rtxt">${a.reasoning||'—'}</div>
+    </div>
+    <div class="abox ab-${sev}">
+      <div class="atitle at-${sev}">Recommended Action</div>
+      <div class="abt-${sev}" style="font-size:12px;line-height:1.5">${a.action_recommended||'—'}</div>
+    </div>
+    <div class="actrow">
+      <button class="actbtn tl" onclick="Sound.playCry('${cls}')">🔊 Hear Demo Audio</button>
+      <button class="actbtn" onclick="Sound.alert('${sev}')">🔔 Test Alert</button>
+    </div>
+    ${camHTML}
+    ${prevPausedHTML}
+  `;
+  if(sessPaused) document.getElementById('ap-paused')?.classList.add('on');
+  bindUpload();
+}
+
+/* ════════════════════════════════════════════
+   CAMERA SNAP POLLING (live preview)
+   ════════════════════════════════════════════ */
+function startSnapPoll(){
+  stopSnapPoll();
+  snapInterval=setInterval(async()=>{
+    if(!sessActive||sessPaused||analysisMode==='audio') return;
+    try{
+      const r=await fetch('/api/snapshot');
+      if(!r.ok) return;
+      const d=await r.json();
+      if(d.image_b64){
+        const img=document.getElementById('snap-img');
+        if(img){
+          img.src=`data:image/jpeg;base64,${d.image_b64}`;
+          img.style.display='block';
+        }
+      }
+    }catch{}
+  },2500);
+}
+function stopSnapPoll(){clearInterval(snapInterval);snapInterval=null;}
+
+/* ════════════════════════════════════════════
+   PHOTO UPLOAD
+   ════════════════════════════════════════════ */
+function triggerUpload(){ document.getElementById('finp').click(); }
+
+function bindUpload(){
+  const uarea=document.getElementById('uarea');
+  if(uarea){
+    uarea.onclick=triggerUpload;
+    uarea.addEventListener('dragover',e=>{e.preventDefault();uarea.classList.add('hl')});
+    uarea.addEventListener('dragleave',()=>uarea.classList.remove('hl'));
+    uarea.addEventListener('drop',e=>{
+      e.preventDefault();uarea.classList.remove('hl');
+      const f=e.dataTransfer.files[0];if(f)processFile(f);
+    });
+  }
+  const uc=document.getElementById('uclear');
+  if(uc) uc.onclick=clearPhoto;
+}
+
+document.getElementById('finp').onchange=e=>{
+  const f=e.target?.files?.[0];if(f)processFile(f);
+};
+
+async function processFile(file){
+  const reader=new FileReader();
+  reader.onload=async ev=>{
+    const b64=ev.target.result.split(',')[1];
+    const uprev=document.getElementById('uprev');
+    const previmg=document.getElementById('previmg');
+    const upov=document.getElementById('upov');
+    const uarea=document.getElementById('uarea');
+    if(previmg) previmg.src=ev.target.result;
+    if(uprev)   uprev.style.display='block';
+    if(uarea)   uarea.style.display='none';
+    if(upov){   upov.style.display='flex';
+                upov.innerHTML='<div style="font-size:22px">🔍</div><div style="margin-top:6px">Analyzing with Gemma 4…</div>';}
+
+    // Pause audio analysis while image is processing
+    if(sessActive&&!sessPaused) await pauseSess();
+
+    try{
+      const r=await fetch('/api/analyze-image',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({image_b64:b64})
+      });
+      const an=await r.json();
+      if(upov) upov.style.display='none';
+      // Show result in main panel + add to alert feed
+      // (WS broadcast from server also calls hdImgAn, this is the direct path)
+      showImageResult(an, ev.target.result);
+      addAlert(an, true);  // true = image source
+      if(an.severity&&an.severity!=='normal') Sound.alert(an.severity);
+    }catch{
+      if(upov){
+        upov.innerHTML='<div style="font-size:18px">⚠</div><div style="margin-top:6px">Analysis failed — is Ollama running?</div>';
+      }
+    }
+    // Do NOT auto-resume — user clicks Resume when ready to return to audio
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearPhoto(){
+  const uprev=document.getElementById('uprev'),uarea=document.getElementById('uarea');
+  if(uprev) uprev.style.display='none';
+  if(uarea) uarea.style.display='block';
+  document.getElementById('finp').value='';
+  imgResultPinned=false;
+}
+
+/* ════════════════════════════════════════════
+   SHOW IMAGE ANALYSIS RESULT
+   ════════════════════════════════════════════ */
+function showImageResult(a, imgDataUrl=null){
+  if(!a?.cry_classification) return;
+  document.getElementById('idlemsg')?.remove();
+  imgResultPinned=true;
+  clearTimeout(window._imgPinTimer);
+  window._imgPinTimer=setTimeout(()=>{ imgResultPinned=false; },30000);
+
+  const ap=document.getElementById('ap');
+  const cls=a.cry_classification, sev=a.severity||'normal', conf=Math.round((a.confidence||0)*100);
+
+  // Preserve paused overlay
+  const prevPaused=document.getElementById('ap-paused');
+  const pausedHTML=prevPaused?prevPaused.outerHTML:
+    `<div class="ap-paused" id="ap-paused">
+      <div class="ap-paused-ico">⏸</div><div class="ap-paused-txt">ANALYSIS PAUSED</div>
+      <div class="ap-paused-sub">Image result shown above.<br>Press ▶ Resume to continue audio monitoring.</div>
+      <button class="ap-paused-upbtn" onclick="togglePause()">▶ Resume Audio Monitoring</button>
+    </div>`;
+
+  const imgHTML = imgDataUrl
+    ? `<div class="cam-preview" style="margin-bottom:4px">
+        <img src="${imgDataUrl}" alt="Analyzed frame" style="max-height:130px">
+        <div class="cam-lbl live">📷 Uploaded Image — ${new Date().toLocaleTimeString()}</div>
+       </div>`
+    : '';
+
+  ap.innerHTML=`
+    <!-- Image analysis banner -->
+    <div style="width:100%;display:flex;align-items:center;gap:8px;padding:6px 10px;
+      background:rgba(61,169,245,.1);border:1px solid rgba(61,169,245,.25);border-radius:8px;
+      font-size:11px;color:var(--blue);font-family:var(--mono)">
+      📷 IMAGE ANALYSIS RESULT
+      <span style="margin-left:auto;font-size:10px;color:var(--text3)">
+        Audio paused — press ▶ Resume when done
+      </span>
+    </div>
+    ${imgHTML}
+    <div class="cbadge cb-${cls}">${CLS[cls]||cls.toUpperCase()}</div>
+    <div class="sevrow">
+      <div class="sevlbl">SEVERITY</div>
+      <div class="sevbadge sv-${sev}">${sev.toUpperCase()}</div>
+      <div class="srctag">${a.source==='gemma'?'✦ Gemma 4':'◆ Fallback'}</div>
+    </div>
+    <div class="confw">
+      <div class="conftop"><div class="conflbl">CONFIDENCE</div><div class="confval">${conf}%</div></div>
+      <div class="conftrack"><div class="conffill" style="width:${conf}%"></div></div>
+    </div>
+    <div class="rbox">
+      <div class="rtitle">Clinical Reasoning</div>
+      <div class="rtxt">${a.reasoning||'—'}</div>
+    </div>
+    <div class="abox ab-${sev}">
+      <div class="atitle at-${sev}">Recommended Action</div>
+      <div class="abt-${sev}" style="font-size:12px;line-height:1.5">${a.action_recommended||'—'}</div>
+    </div>
+    <div class="actrow">
+      <button class="actbtn tl" onclick="Sound.playCry('${cls}')">🔊 Hear Demo Audio</button>
+      <button class="actbtn" onclick="Sound.alert('${sev}')">🔔 Test Alert</button>
+      <button class="actbtn" onclick="togglePause()" style="border-color:rgba(0,229,176,.4);color:var(--teal)">
+        ▶ Resume Monitoring
+      </button>
+    </div>
+    ${pausedHTML}
+  `;
+  // Re-show paused overlay (audio is still paused)
+  if(sessPaused) document.getElementById('ap-paused')?.classList.add('on');
+  bindUpload();
+}
+
+/* ════════════════════════════════════════════
+   ALERT FEED
+   ════════════════════════════════════════════ */
+function addAlert(a, isImage=false){
+  const list=document.getElementById('alist');
+  list.querySelector('.empty-feed')?.remove();
+  const sev=a.severity||'monitor', cls=a.cry_classification||'unknown';
+  // Deduplicate: skip if identical entry added within last 2 s
+  const first=list.firstElementChild;
+  if(first&&first.dataset.cls===cls&&Date.now()-Number(first.dataset.ts)<2000) return;
+  const el=document.createElement('div'); el.className='aitem';
+  el.dataset.cls=cls; el.dataset.ts=Date.now();
+  const icon=isImage?'📷':'🔊';
+  const srcLabel=isImage?'<span style="font-size:9px;color:var(--blue);font-family:var(--mono);margin-left:4px">IMG</span>':'';
+  el.innerHTML=`<div class="aitop">
+      <div class="adot ad-${sev}"></div>
+      <div class="acls">${CLS[cls]||cls}${srcLabel}</div>
+      <button class="asnd" onclick="Sound.playCry('${cls}')" title="Play audio">${icon}</button>
+      <div class="atime">${new Date().toLocaleTimeString()}</div>
+    </div>
+    <div class="anote">${a.clinical_note||a.reasoning||''}</div>
+    <div class="asev" style="color:${SC(sev)}">${sev.toUpperCase()}${isImage?' · Visual':''}</div>`;
+  list.insertBefore(el,list.firstChild);
+  while(list.children.length>30) list.removeChild(list.lastChild);
+}
+const SC=s=>({normal:'#2ECC71',monitor:'#F5A623',urgent:'#FF4757',critical:'#FF1A2E'})[s]||'#8BA8C4';
+
+/* ════════════════════════════════════════════
+   REPORT
+   ════════════════════════════════════════════ */
+function toggleRpt(){document.getElementById('rpt-menu').classList.toggle('open');}
+document.addEventListener('click',e=>{if(!e.target.closest('.rpt-wrap'))document.getElementById('rpt-menu')?.classList.remove('open');});
+function dlReport(h){
+  document.getElementById('rpt-menu').classList.remove('open');
+  const a=document.createElement('a');a.href=`/api/report?hours=${h}`;
+  a.download=`echoglow_${h}h_report.pdf`;a.click();
+}
+
+/* ════════════════════════════════════════════
+   DEMO/LIVE TOGGLE
+   ════════════════════════════════════════════ */
+function onModeToggle(){
+  liveMode=document.getElementById('live-chk').checked;
+  document.getElementById('lbl-demo').classList.toggle('active',!liveMode);
+  document.getElementById('lbl-live').classList.toggle('active', liveMode);
+}
+
+/* ════════════════════════════════════════════
+   ANALYSIS MODE SELECTOR
+   ════════════════════════════════════════════ */
+function amodeLabel(m){
+  return m==='audio'?'🎤 AUDIO ONLY':m==='video'?'📷 VIDEO ONLY':'🎤+📷 AUDIO+VIDEO';
+}
+
+function syncAmodeUI(m){
+  document.querySelectorAll('.ams').forEach(b=>{
+    b.classList.toggle('on', b.dataset.m===m);
+  });
+  document.getElementById('amode-badge').textContent=amodeLabel(m);
+  document.getElementById('fam').textContent=m.toUpperCase();
+}
+
+async function setAMode(m){
+  analysisMode=m;syncAmodeUI(m);
+  if(sessActive){
+    await fetch('/api/set-mode',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({analysis_mode:m})});
+    if(m!=='audio'&&camOK&&!sessPaused) startSnapPoll();
+    else stopSnapPoll();
+  }
+  renderCentre(null);
+}
+
+/* ════════════════════════════════════════════
+   SESSION CONTROLS
+   ════════════════════════════════════════════ */
+async function startSess(){
+  Sound.warm();
+  const sim=!liveMode;
+  const r=await fetch('/api/start',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({simulation:sim, analysis_mode:analysisMode})});
+  const d=await r.json();
+  if(d.status==='started'||d.status==='already_running'){
+    sessActive=true;sessPaused=false;
+    showBtns(true);setFMode(d.mode||'live');
+    document.getElementById('rdot').classList.add('on');
+    syncAmodeUI(analysisMode);
+    if(analysisMode!=='audio'&&camOK) startSnapPoll();
+    renderCentre(null);
+  }
+}
+
+async function stopSess(){
+  await fetch('/api/stop',{method:'POST'});
+  sessActive=false;sessPaused=false;stopSnapPoll();showBtns(false);
+}
+
+async function togglePause(){
+  if(sessPaused) await resumeSess();
+  else           await pauseSess();
+}
+
+async function pauseSess(){await fetch('/api/pause',{method:'POST'});}
+async function resumeSess(){await fetch('/api/resume',{method:'POST'});}
+
+/* ════════════════════════════════════════════
+   HELPERS
+   ════════════════════════════════════════════ */
+function updVol(v){
+  document.getElementById('volfill').style.width=Math.min(100,v*200)+'%';
+  document.getElementById('volval').textContent=v.toFixed(4);
+}
+function updCry(det,dur){
+  document.getElementById('crydot').classList.toggle('on',!!det);
+  document.getElementById('crytxt').textContent=det?'Cry Detected':'No Cry Detected';
+  document.getElementById('crydur').textContent=det&&dur>0?`${dur.toFixed(0)}s`:'';
+}
+function updDur(s){
+  document.getElementById('fdur').textContent=
+    String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0');
+}
+function setFMode(m){
+  const el=document.getElementById('fmode');el.textContent=m.toUpperCase();el.classList.remove('paused');
+}
+function badge(id,lbl,st){
+  const el=document.getElementById(id);if(!el)return;
+  el.textContent=lbl;el.className='badge '+st;
+}
+function showBtns(active){
+  document.getElementById('btn-go').style.display=active?'none':'';
+  document.getElementById('btn-stop').style.display=active?'':'none';
+  document.getElementById('btn-pause').style.display=active?'':'none';
+  document.querySelector('.amode-sel').style.opacity=active?'.6':'1';
+  document.querySelector('.mode-toggle').style.opacity=active?'.4':'1';
+  document.querySelector('.mt-sw').style.pointerEvents=active?'none':'auto';
+}
+function pushWave(v){waveData.push(v);if(waveData.length>300)waveData.shift();}
+
+/* ════════════════════════════════════════════
+   WAVEFORM CANVAS
+   ════════════════════════════════════════════ */
+const CV=document.getElementById('cv'),CX=CV.getContext('2d');let LT=0;
+
+function resize(){
+  const r=CV.parentElement.getBoundingClientRect();
+  CV.width=r.width*devicePixelRatio;CV.height=r.height*devicePixelRatio;
+  CX.scale(devicePixelRatio,devicePixelRatio);
+}
+
+function draw(ts){
+  requestAnimationFrame(draw);if(ts-LT<50)return;LT=ts;
+  const W=CV.width/devicePixelRatio,H=CV.height/devicePixelRatio;
+  CX.clearRect(0,0,W,H);
+  const bg=CX.createLinearGradient(0,0,0,H);
+  bg.addColorStop(0,'#0D1520');bg.addColorStop(1,'#070C14');
+  CX.fillStyle=bg;CX.fillRect(0,0,W,H);
+  CX.strokeStyle='rgba(30,48,72,0.6)';CX.lineWidth=1;
+  for(let i=1;i<4;i++){CX.beginPath();CX.moveTo(0,H/4*i);CX.lineTo(W,H/4*i);CX.stroke()}
+  CX.strokeStyle='rgba(0,229,176,0.08)';CX.beginPath();CX.moveTo(0,H/2);CX.lineTo(W,H/2);CX.stroke();
+
+  const pts=waveData.slice(-Math.floor(W/2));
+  const xs=W/Math.max(pts.length-1,1),mY=H/2,sc=H*.42;
+  const lc=sessPaused?'rgba(155,109,255,0.6)':
+            analysisMode==='video'?'rgba(61,169,245,0.8)':'#00E5B0';
+  const gt=sessPaused?'rgba(155,109,255,0.12)':
+            analysisMode==='video'?'rgba(61,169,245,0.15)':'rgba(0,229,176,0.18)';
+  const sh=sessPaused?'rgba(155,109,255,0.35)':
+            analysisMode==='video'?'rgba(61,169,245,0.4)':'rgba(0,229,176,0.4)';
+
+  CX.save();CX.shadowBlur=10;CX.shadowColor=sh;
+  const g=CX.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,gt);g.addColorStop(1,'rgba(0,0,0,0)');
+  CX.beginPath();
+  pts.forEach((v,i)=>{const x=i*xs,y=mY-Math.min(v,1)*sc;i?CX.lineTo(x,y):CX.moveTo(x,y)});
+  for(let i=pts.length-1;i>=0;i--) CX.lineTo(i*xs,mY+Math.min(pts[i],1)*sc);
+  CX.closePath();CX.fillStyle=g;CX.fill();
+  CX.beginPath();CX.lineWidth=1.8;CX.strokeStyle=lc;
+  pts.forEach((v,i)=>{const x=i*xs,y=mY-Math.min(v,1)*sc;i?CX.lineTo(x,y):CX.moveTo(x,y)});
+  CX.stroke();
+  CX.beginPath();CX.strokeStyle=lc.replace('0.6','0.2').replace('0.8','0.25');CX.lineWidth=1;
+  pts.forEach((v,i)=>{const x=i*xs,y=mY+Math.min(v,1)*sc;i?CX.lineTo(x,y):CX.moveTo(x,y)});
+  CX.stroke();CX.restore();
+}
+
+window.addEventListener('DOMContentLoaded',()=>{
+  resize();window.addEventListener('resize',resize);
+  requestAnimationFrame(draw);connectWS();
+});
+
+/* ════════════════════════════════════════════
+   DEMO IMAGE GENERATOR
+   Produces canvas-based synthetic NICU camera
+   frames that Gemma 4 can visually analyse.
+   ════════════════════════════════════════════ */
+function generateDemoImage(type='normal'){
+  const cv=document.getElementById('demo-canvas');
+  const cx=cv.getContext('2d');
+  const W=320,H=240;
+
+  // ── Background: dark like a night-vision / IR camera ──
+  const bg=cx.createRadialGradient(W/2,H/2,10,W/2,H/2,160);
+  bg.addColorStop(0,'#0d1a0d'); bg.addColorStop(1,'#060c06');
+  cx.fillStyle=bg; cx.fillRect(0,0,W,H);
+
+  // ── Crib frame ──
+  cx.strokeStyle='rgba(0,180,80,.35)'; cx.lineWidth=2;
+  cx.strokeRect(18,30,284,185);
+  cx.strokeStyle='rgba(0,180,80,.15)'; cx.lineWidth=1;
+  cx.strokeRect(22,34,276,177);
+
+  // ── Mattress ──
+  cx.fillStyle='rgba(20,50,20,.7)';
+  roundRect(cx,26,38,268,169,4);cx.fill();
+
+  // ── Infant body (top-down view) ──
+  const bodyCol = type==='distress'?'rgba(100,200,80,.85)':'rgba(80,180,60,.75)';
+  cx.fillStyle=bodyCol;
+  cx.beginPath(); cx.ellipse(160,148,52,30,0,0,Math.PI*2); cx.fill();
+
+  // ── Head ──
+  cx.fillStyle = type==='distress'?'rgba(90,190,70,.9)':'rgba(75,170,55,.85)';
+  cx.beginPath(); cx.ellipse(108,132,26,24,-.15,0,Math.PI*2); cx.fill();
+
+  // ── Arms ──
+  cx.fillStyle='rgba(80,160,60,.6)';
+  cx.beginPath(); cx.ellipse(155,113,10,20,-.4,0,Math.PI*2); cx.fill();
+  cx.beginPath(); cx.ellipse(190,115,10,20,.4,0,Math.PI*2); cx.fill();
+
+  if(type==='distress'){
+    // ── Chest retraction indicator ──
+    cx.strokeStyle='rgba(255,80,80,.8)'; cx.lineWidth=1.5; cx.setLineDash([3,3]);
+    cx.beginPath(); cx.ellipse(168,140,30,17,0,0,Math.PI*2); cx.stroke();
+    cx.setLineDash([]);
+    // ── SpO2 warning band ──
+    cx.fillStyle='rgba(255,60,60,.9)';
+    cx.font='bold 9px monospace'; cx.fillText('SpO\u2082: 89%  \u26a0',162,178);
+    // ── Motion vectors (distress movement) ──
+    cx.strokeStyle='rgba(255,200,50,.5)'; cx.lineWidth=1;
+    [[140,105,8,-8],[180,110,-7,-9],[155,175,6,8]].forEach(([x,y,dx,dy])=>{
+      cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+dx,y+dy);cx.stroke();
+      cx.beginPath();cx.arc(x,y,2,0,Math.PI*2);cx.fillStyle='rgba(255,200,50,.6)';cx.fill();
+    });
+  } else {
+    // ── Calm: gentle breathing wave ──
+    cx.strokeStyle='rgba(0,229,176,.4)'; cx.lineWidth=1;
+    cx.beginPath();
+    for(let i=0;i<60;i++){
+      const x=130+i*1.5, y=162+Math.sin(i*.35)*4;
+      i===0?cx.moveTo(x,y):cx.lineTo(x,y);
+    } cx.stroke();
+  }
+
+  // ── Vital signs overlay ──
+  cx.fillStyle='rgba(0,0,0,.55)';
+  cx.fillRect(0,0,W,22); cx.fillRect(0,H-22,W,22);
+
+  cx.fillStyle='#00e5b0'; cx.font='bold 9px monospace';
+  cx.fillText('EchoGlow NICU CAM-01',6,14);
+  cx.fillStyle='rgba(0,229,176,.6)'; cx.font='9px monospace';
+  cx.fillText(new Date().toLocaleTimeString(),230,14);
+
+  // Bottom status
+  if(type==='distress'){
+    cx.fillStyle='#ff4757'; cx.font='bold 9px monospace';
+    cx.fillText('\u25cf MOTION  RR:62  ABNORMAL BREATHING',6,H-8);
+  } else {
+    cx.fillStyle='#00e5b0'; cx.font='9px monospace';
+    cx.fillText('\u25cf STABLE  RR:38  SpO\u2082:98%  BREATHING NORMAL',6,H-8);
+  }
+
+  // ── Frame corners (scope reticle) ──
+  cx.strokeStyle='rgba(0,229,176,.3)'; cx.lineWidth=1;
+  [[6,26],[W-6,26],[6,H-26],[W-6,H-26]].forEach(([x,y])=>{
+    const s=8,dx=x<W/2?1:-1,dy=y<H/2?1:-1;
+    cx.beginPath();cx.moveTo(x,y);cx.lineTo(x+s*dx,y);
+    cx.moveTo(x,y);cx.lineTo(x,y+s*dy);cx.stroke();
+  });
+
+  return cv.toDataURL('image/jpeg',.82).split(',')[1];
+}
+
+function roundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);
+  ctx.arcTo(x+w,y,x+w,y+r,r);ctx.lineTo(x+w,y+h-r);
+  ctx.arcTo(x+w,y+h,x+w-r,y+h,r);ctx.lineTo(x+r,y+h);
+  ctx.arcTo(x,y+h,x,y+h-r,r);ctx.lineTo(x,y+r);
+  ctx.arcTo(x,y,x+r,y,r);ctx.closePath();
+}
+
+/* ════════════════════════════════════════════
+   NARRATION OVERLAY
+   ════════════════════════════════════════════ */
+let _narTimer=null;
+function narrate(text, duration=5000){
+  const el=document.getElementById('narrator');
+  el.textContent=text; el.classList.add('on');
+  clearTimeout(_narTimer);
+  _narTimer=setTimeout(()=>el.classList.remove('on'), duration);
+}
+
+/* ════════════════════════════════════════════
+   DEMO RUNNER — scripted submission video flow
+   Total runtime ≈ 2 min 20 sec
+   ════════════════════════════════════════════ */
+const DEMO_TOTAL_MS = 140000;
+
+const Demo = {
+  _timers: [],
+  _running: false,
+  _startedAt: 0,
+  _barInterval: null,
+
+  /* ── Script ───────────────────────────────── */
+  _script: [
+    // t(ms), stepLabel, narratorText, action
+    { t:     0, lbl:'1/7  Baseline',
+      narr:'📊 Session started — establishing baseline. Infant calm.',
+      fn: null },
+
+    { t:  8000, lbl:'2/7  Audio: Hunger',
+      narr:'🎤 Hunger cry detected — rhythmic 380 Hz pattern with regular pauses',
+      fn: null },
+
+    { t: 25000, lbl:'3/7  Audio: Pain',
+      narr:'⚠ Pain cry escalating — high-pitched urgent vocalization above 500 Hz',
+      fn: null },
+
+    { t: 38000, lbl:'4/7  Visual Analysis',
+      narr:'📷 Switching to Video mode — uploading camera frame to Gemma 4...',
+      fn: async (self)=>{
+        await setAMode('video');
+        await delay(1200);
+        await self._runImageAnalysis('normal');
+      }},
+
+    { t: 58000, lbl:'5/7  Visual Confirmed',
+      narr:'✅ Visual: infant calm, SpO₂ 98%, breathing normal — no visual distress',
+      fn: null },
+
+    { t: 68000, lbl:'6/7  Audio + Visual',
+      narr:'🎤+📷 Activating combined Audio + Visual monitoring for full assessment',
+      fn: async (self)=>{
+        await setAMode('both');
+        await delay(3000);
+        narrate('🚨 CRITICAL: Stridor + visual chest retractions — immediate response required', 8000);
+        await self._runImageAnalysis('distress');
+      }},
+
+    { t: 98000, lbl:'7/7  Report',
+      narr:'📄 Generating clinical summary report — downloading now...',
+      fn: async ()=>{
+        await delay(1500);
+        dlReport(1);
+        await delay(2500);
+        narrate('✅ Report downloaded — session complete. Open the PDF to review all alerts.', 8000);
+      }},
+
+    { t:130000, lbl:'Complete',
+      narr:'🎬 Demo complete — press ■ Stop to end session',
+      fn: (self)=>{ self._finish(); }},
+  ],
+
+  /* ── Public ───────────────────────────────── */
+  toggle(){
+    if(this._running) this.stop();
+    else              this.run();
+  },
+
+  async run(){
+    if(this._running) return;
+    this._running=true;
+    document.getElementById('btn-fulldemo').classList.add('running');
+    document.getElementById('btn-fulldemo').textContent='⏹ Stop Demo';
+
+    // Force DEMO mode and audio analysis mode, then start session
+    document.getElementById('live-chk').checked=false;
+    onModeToggle();
+    await setAMode('audio');
+    await startSess();
+
+    this._startedAt=Date.now();
+    this._startBar();
+
+    // Schedule all steps
+    this._script.forEach(step=>{
+      const t=setTimeout(async ()=>{
+        this._setStep(step.lbl);
+        narrate(step.narr);
+        if(step.fn) await step.fn(this);
+      }, step.t);
+      this._timers.push(t);
+    });
+  },
+
+  stop(){
+    this._timers.forEach(t=>clearTimeout(t));
+    this._timers=[];
+    clearInterval(this._barInterval);
+    this._running=false;
+    this._setStep('');
+    document.getElementById('demo-bar').classList.remove('on');
+    document.getElementById('demo-step-lbl').classList.remove('on');
+    document.getElementById('btn-fulldemo').classList.remove('running');
+    document.getElementById('btn-fulldemo').textContent='🎬 Full Demo';
+  },
+
+  _finish(){
+    this.stop();
+  },
+
+  /* ── Helpers ──────────────────────────────── */
+  _startBar(){
+    const bar=document.getElementById('demo-bar');
+    const lbl=document.getElementById('demo-step-lbl');
+    bar.classList.add('on'); lbl.classList.add('on');
+    bar.style.width='0%';
+    this._barInterval=setInterval(()=>{
+      if(!this._running){clearInterval(this._barInterval);return;}
+      const pct=Math.min(100,((Date.now()-this._startedAt)/DEMO_TOTAL_MS)*100);
+      bar.style.width=pct+'%';
+    },500);
+  },
+
+  _setStep(label){
+    const el=document.getElementById('demo-step-lbl');
+    el.textContent=label?`DEMO  ${label}`:'';
+  },
+
+  async _runImageAnalysis(type){
+    const b64=generateDemoImage(type);
+    const dataUrl=`data:image/jpeg;base64,${b64}`;
+
+    // Show the generated frame in the upload preview area if visible
+    const previmg=document.getElementById('previmg');
+    const uprev=document.getElementById('uprev');
+    const uarea=document.getElementById('uarea');
+    if(previmg){ previmg.src=dataUrl; }
+    if(uprev)  { uprev.style.display='block'; }
+    if(uarea)  { uarea.style.display='none'; }
+
+    try{
+      const r=await fetch('/api/analyze-image',{
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({image_b64:b64})
+      });
+      const an=await r.json();
+      showImageResult(an, dataUrl);
+      addAlert(an, true);
+      if(an.severity&&an.severity!=='normal') Sound.alert(an.severity);
+    }catch(e){
+      console.warn('Demo image analysis failed:',e);
+    }
+  },
+};
+
+function delay(ms){ return new Promise(r=>setTimeout(r,ms)); }
+</script>
+</body>
+</html>
