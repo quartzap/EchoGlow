@@ -1,6 +1,5 @@
 <div align="center">
 
-<img src="docs/thumbnail.jpg" alt="EchoGlow banner" width="100%"/>
 
 # 🫁 EchoGlow
 
