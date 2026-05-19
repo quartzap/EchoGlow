@@ -15,7 +15,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-F5A623)](LICENSE)
 [![Kaggle](https://img.shields.io/badge/Kaggle-Gemma_4_Good_Hackathon-20BEFF?logo=kaggle)](https://www.kaggle.com/competitions/gemma-4-good-hackathon)
 
-[**▶ Watch Demo (YouTube)**](https://YOUR_YOUTUBE_LINK_HERE) · [**Kaggle Submission**](https://www.kaggle.com/competitions/gemma-4-good-hackathon/projects) · [**Live Demo**](http://localhost:8765)
+
 
 </div>
 
